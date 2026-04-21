@@ -17,17 +17,17 @@
 # under the License.
 #
 
-name: Build release wheels
+name: Build wheels
 on:
   push:
     branches:
       - '*'
-  # Build the same wheels as a tag push; download wheel artifacts from the run
-  # (no GitHub Release is created unless the ref is a tag — see publish job).
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  # Required for actions/upload-artifact and buildx cache (type=gha); not a package registry.
+  actions: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,14 +54,10 @@ jobs:
           - {version: '3.14', spec: 'cp314-cp314'}
         cpu:
           - {arch: 'x86_64', platform: 'x86_64'}
-          - {arch: 'aarch64', platform: 'arm64'}
 
     steps:
       - name: checkout
         uses: actions/checkout@v3
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a
 
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
 
@@ -125,93 +121,3 @@ jobs:
         with:
           name: wheel-mac-py${{matrix.py.version}}
           path: dist/*.whl
-
-  windows-wheels:
-    name: Wheel Windows - Py ${{matrix.python.version}}
-    runs-on: windows-2022
-    env:
-      PULSAR_CPP_DIR: 'C:\\pulsar-cpp'
-    timeout-minutes: 300
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python:
-          - {version: '3.10'}
-          - {version: '3.11'}
-          - {version: '3.12'}
-          - {version: '3.13'}
-          - {version: '3.14'}
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python.version }}
-
-      - name: Download Pulsar C++ client on Windows
-        shell: bash
-        run: |
-          source ./build-support/dep-url.sh
-          BASE_URL=$(pulsar_cpp_base_url $(grep pulsar-cpp dependencies.yaml | awk '{print $2}'))
-          mkdir -p ${{ env.PULSAR_CPP_DIR }}
-          cd ${{ env.PULSAR_CPP_DIR }}
-          curl -O -L ${BASE_URL}/x64-windows-static.tar.gz
-          tar zxf x64-windows-static.tar.gz
-          mv x64-windows-static/* .
-          ls -l ${{ env.PULSAR_CPP_DIR }}
-
-      - name: Configure CMake
-        shell: bash
-        run: |
-          pip3 install pyyaml
-          export PYBIND11_VERSION=$(./build-support/dep-version.py pybind11)
-          curl -L -O https://github.com/pybind/pybind11/archive/refs/tags/v${PYBIND11_VERSION}.tar.gz
-          tar zxf v${PYBIND11_VERSION}.tar.gz
-          rm -rf pybind11
-          mv pybind11-${PYBIND11_VERSION} pybind11
-          cmake -B build -A x64 \
-            -DCMAKE_PREFIX_PATH=${{ env.PULSAR_CPP_DIR }} \
-            -DLINK_STATIC=ON
-
-      - name: Build Python wheel
-        shell: bash
-        run: |
-          cmake --build build --config Release --target install
-          python -m pip install wheel setuptools
-          python setup.py bdist_wheel
-          python -m pip install ./dist/*.whl
-          python -c 'import pulsar; c = pulsar.Client("pulsar://localhost:6650"); c.close()'
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheel-windows-py${{matrix.python.version}}
-          path: dist/*.whl
-
-  publish-github-release:
-    name: Publish wheels to GitHub Release
-    if: github.ref_type == 'tag'
-    needs:
-      - linux-wheel
-      - mac-wheels
-      - windows-wheels
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all wheel artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
-          merge-multiple: true
-
-      - name: List wheels
-        run: find dist -name '*.whl' | sort
-
-      - name: Create GitHub Release with wheel assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/**/*.whl
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

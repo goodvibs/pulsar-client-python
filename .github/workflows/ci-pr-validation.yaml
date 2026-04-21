@@ -123,9 +123,6 @@ jobs:
       - name: checkout
         uses: actions/checkout@v3
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a
-
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
 
       - name: Build Manylinux Docker image
@@ -150,7 +147,9 @@ jobs:
 
       - name: Test wheel file
         run: |
-          docker run -i -v $PWD:/pulsar-client-python python:${{matrix.python.version}}${{matrix.image.py_suffix}} \
+          docker run -i -v $PWD:/pulsar-client-python \
+              --platform linux/${{matrix.cpu.arch}} \
+              python:${{matrix.python.version}}${{matrix.image.py_suffix}} \
               /pulsar-client-python/pkg/test-wheel.sh
 
   mac-wheels:
@@ -172,61 +171,6 @@ jobs:
         run: |
           pkg/mac/build-mac-wheels.sh ${{matrix.py.version}} ${{matrix.py.version_long}}
 
-  windows-wheels:
-    name: "Python ${{ matrix.python.version }} Wheel on Windows x64"
-    needs: unit-tests
-    runs-on: windows-2022
-    timeout-minutes: 120
-
-    env:
-      PULSAR_CPP_DIR: 'C:\\pulsar-cpp'
-    strategy:
-      fail-fast: false
-      matrix:
-        python:
-          - version: '3.14'
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python.version }}
-
-      - name: Download Pulsar C++ client on Windows
-        shell: bash
-        run: |
-          source ./build-support/dep-url.sh
-          BASE_URL=$(pulsar_cpp_base_url $(grep pulsar-cpp dependencies.yaml | awk '{print $2}'))
-          mkdir -p ${{ env.PULSAR_CPP_DIR }}
-          cd ${{ env.PULSAR_CPP_DIR }}
-          curl -O -L ${BASE_URL}/x64-windows-static.tar.gz
-          tar zxf x64-windows-static.tar.gz
-          mv x64-windows-static/* .
-          ls -l ${{ env.PULSAR_CPP_DIR }}
-
-      - name: Configure CMake
-        shell: bash
-        run: |
-          pip3 install pyyaml
-          export PYBIND11_VERSION=$(./build-support/dep-version.py pybind11)
-          curl -L -O https://github.com/pybind/pybind11/archive/refs/tags/v${PYBIND11_VERSION}.tar.gz
-          tar zxf v${PYBIND11_VERSION}.tar.gz
-          rm -rf pybind11
-          mv pybind11-${PYBIND11_VERSION} pybind11
-          cmake -B build -A x64 \
-            -DCMAKE_PREFIX_PATH=${{ env.PULSAR_CPP_DIR }} \
-            -DLINK_STATIC=ON
-
-      - name: Build Python wheel
-        shell: bash
-        run: |
-          cmake --build build --config Release --target install
-          python -m pip install wheel setuptools
-          python setup.py bdist_wheel
-          python -m pip install ./dist/*.whl
-          python -c 'import pulsar; c = pulsar.Client("pulsar://localhost:6650"); c.close()'
-
   check-completion:
     name: Check Completion
     runs-on: ubuntu-latest
@@ -235,8 +179,7 @@ jobs:
       check-and-lint,
       unit-tests,
       linux-wheel,
-      mac-wheels,
-      windows-wheels
+      mac-wheels
     ]
     steps:
       - run: |
@@ -245,7 +188,6 @@ jobs:
                   && "${{ needs.unit-tests.result }}" == "success" \
                   && "${{ needs.linux-wheel.result }}" == "success" \
                   && "${{ needs.mac-wheels.result }}" == "success" \
-                  && "${{ needs.windows-wheels.result }}" == "success" \
                 ) ]]; then
               echo "Required jobs haven't been completed successfully."
               exit 1
