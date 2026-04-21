@@ -20,8 +20,11 @@
 name: Build release wheels
 on:
   push:
-    tags:
+    branches:
       - '*'
+  # Build the same wheels as a tag push; download wheel artifacts from the run
+  # (no GitHub Release is created unless the ref is a tag — see publish job).
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -189,6 +192,7 @@ jobs:
 
   publish-github-release:
     name: Publish wheels to GitHub Release
+    if: github.ref_type == 'tag'
     needs:
       - linux-wheel
       - mac-wheels

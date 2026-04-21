@@ -81,4 +81,4 @@ mv build/lib_pulsar.so .
 # Audit wheel will make sure no external dependencies are needed for
 # the shared library and that only symbols supported by most linux
 # distributions are used.
-auditwheel repair dist/pulsar_client*-$PYTHON_SPEC-linux_*.whl
+auditwheel repair dist/*-$PYTHON_SPEC-linux_*.whl

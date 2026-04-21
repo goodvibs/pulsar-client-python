@@ -153,5 +153,5 @@ PY_SPEC=$(echo $PYTHON_VERSION | sed 's/\.//g')
 
 cd /tmp
 $PIP_EXE install --no-dependencies --force-reinstall \
-    $ROOT_DIR/dist/pulsar_client-${PYTHON_CLIENT_VERSION}-cp$PY_SPEC-*-macosx*_${PIP_TAG}.whl
+    $ROOT_DIR/dist/*-${PYTHON_CLIENT_VERSION}-cp$PY_SPEC-*-macosx*_${PIP_TAG}.whl
 $PY_EXE -c 'import pulsar'

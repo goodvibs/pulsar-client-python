@@ -22,7 +22,7 @@ set -e -x
 
 cd /
 
-pip3 install /pulsar-client-python/wheelhouse/pulsar_client-*.whl
+pip3 install /pulsar-client-python/wheelhouse/*.whl
 
 # Load the wheel to ensure there are no linking problems
 python3 -c 'import pulsar'

@@ -37,7 +37,7 @@ def get_version():
 
 def get_name():
     postfix = environ.get('NAME_POSTFIX', '')
-    base = 'pulsar-client'
+    base = environ.get('PIP_PACKAGE_NAME', 'pulsar-client-hotfix')
     return base + postfix
 
 

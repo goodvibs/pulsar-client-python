@@ -45,5 +45,5 @@ download_wheels linux-musl-x86_64
 download_wheels macos
 download_wheels windows
 
-twine upload pulsar_client-*.whl
-rm -f pulsar_client-*.whl
+twine upload ./*.whl
+rm -f ./*.whl
